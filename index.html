@@ -1096,71 +1096,80 @@ window.MIREX = (function(){
     renderBars();
   }
 
-  // Zoom-to-country transform on the zoomG layer
+  /* Computes the zoom target values (translate + scale) for the selected country.
+     Returns { tx, ty, k } — k=1 and tx=ty=0 when no country is selected. */
+  function zoomTarget(){
+    if (!pathGen || !state.selectedCountry || !featureByName[state.selectedCountry])
+      return { tx:0, ty:0, k:1 };
+    const feat = featureByName[state.selectedCountry];
+    const b   = pathGen.bounds(feat);
+    const bw  = b[1][0] - b[0][0];
+    const bh  = b[1][1] - b[0][1];
+    const cx  = (b[0][0] + b[1][0]) / 2;
+    const cy  = (b[0][1] + b[1][1]) / 2;
+    let k = Math.min((VIEW_W * 0.7) / bw, (VIEW_H * 0.7) / bh, 6);
+    if (!isFinite(k) || k < 1) k = 1;
+    return { tx: VIEW_W / 2 - cx * k, ty: VIEW_H / 2 - cy * k, k };
+  }
+
+  /* Updates every map label's size and visibility for the given zoom level k.
+     Called immediately when zoom starts AND again when the transition ends,
+     so labels are always in sync regardless of resize interruptions. */
+  function updateMapLabels(k){
+    const isZoomed = !!state.selectedCountry;
+    Object.keys(labelById).forEach(name => {
+      const lab   = labelById[name];
+      const isSel = state.selectedCountry === name;
+      const score = data[name][state.dimension];
+      const node  = n => n && n.node ? n.node() : n; // unwrap D3 selection to DOM node
+
+      // Code abbreviation — always hidden (score replaces it)
+      lab.code.node().setAttribute("style", "visibility:hidden");
+
+      // Full country name — only for the selected country
+      if (lab.fullName){
+        const el = lab.fullName.node();
+        el.setAttribute("style", isSel
+          ? `visibility:visible;font-size:${24/k}px;stroke-width:${3/k}px`
+          : "visibility:hidden");
+        lab.fullName.attr("y", -22 / k);
+      }
+
+      // Score number — shown for selected country; shown for all when not zoomed
+      const scoreEl = lab.score.node();
+      lab.score.text(score);
+      scoreEl.setAttribute("style", (!isZoomed || isSel)
+        ? `visibility:visible;font-size:${isSel ? 28/k : 18}px;stroke-width:${isSel ? 3.4/k : 3.5}px`
+        : "visibility:hidden");
+      lab.score.attr("y", isSel ? 4 / k : 4);
+
+      // Dimension label — only under the selected country's score
+      if (lab.bandLabel){
+        const bandEl = lab.bandLabel.node();
+        lab.bandLabel.text(isSel ? currentDim().label : "");
+        bandEl.setAttribute("style", isSel
+          ? `visibility:visible;font-size:${13/k}px;stroke-width:${2.4/k}px`
+          : "visibility:hidden");
+        lab.bandLabel.attr("y", 25 / k);
+      }
+    });
+  }
+
+  // Zoom-to-country transform on the map group layer
   function applyZoom(){
     if (!pathGen) return;
-    let tx = 0, ty = 0, k = 1;
-    if (state.selectedCountry && featureByName[state.selectedCountry]){
-      const feat = featureByName[state.selectedCountry];
-      const b   = pathGen.bounds(feat);
-      const bw  = b[1][0] - b[0][0];
-      const bh  = b[1][1] - b[0][1];
-      const cx  = (b[0][0] + b[1][0]) / 2;
-      const cy  = (b[0][1] + b[1][1]) / 2;
-      const padX = VIEW_W * 0.7;
-      const padY = VIEW_H * 0.7;
-      k = Math.min(padX / bw, padY / bh, 6);
-      if (!isFinite(k) || k < 1) k = 1;
-      tx = VIEW_W / 2 - cx * k;
-      ty = VIEW_H / 2 - cy * k;
-    }
+    const { tx, ty, k } = zoomTarget();
 
-    // Animate the map group to the new pan/zoom position
     mapGroup.interrupt("zoom");
     mapGroup.transition("zoom").duration(650).ease(d3.easeCubicInOut)
-      .attr("transform", `translate(${tx},${ty}) scale(${k})`);
+      .attr("transform", `translate(${tx},${ty}) scale(${k})`)
+      .on("end", () => updateMapLabels(k));   // re-apply after transition in case of interruptions
 
     countriesLayer.selectAll("path.country")
       .attr("vector-effect", "non-scaling-stroke")
       .attr("stroke-width", null);
 
-    // Update label sizes and visibility immediately (no transition needed)
-    const isZoomed = !!state.selectedCountry;
-    Object.keys(labelById).forEach(name => {
-      const lab      = labelById[name];
-      const isSel    = state.selectedCountry === name;
-      const score    = data[name][state.dimension];
-
-      // Country code abbreviation — always hidden
-      lab.code.attr("style", "display:none");
-
-      // Full country name — visible only for the selected country
-      if (lab.fullName){
-        lab.fullName
-          .attr("style", isSel
-            ? `display:block;opacity:1;font-size:${24/k}px;stroke-width:${3/k}px`
-            : `display:none;opacity:0`)
-          .attr("y", -22 / k);
-      }
-
-      // Score number — visible for selected country, and for all countries when not zoomed
-      lab.score
-        .text(score)
-        .attr("style", (!isZoomed || isSel)
-          ? `display:block;opacity:1;font-size:${isSel ? 28/k : 18}px;stroke-width:${isSel ? 3.4/k : 3.5}px`
-          : `display:none;opacity:0`)
-        .attr("y", isSel ? 4 / k : 4);
-
-      // Dimension label — visible only under the selected country's score
-      if (lab.bandLabel){
-        lab.bandLabel
-          .text(isSel ? currentDim().label : "")
-          .attr("style", isSel
-            ? `display:block;opacity:1;font-size:${13/k}px;stroke-width:${2.4/k}px`
-            : `display:none;opacity:0`)
-          .attr("y", 25 / k);
-      }
-    });
+    updateMapLabels(k);   // apply immediately so labels don't lag behind the animation start
   }
 
   function currentDim(){ return dimensions.find(d => d.key === state.dimension); }
