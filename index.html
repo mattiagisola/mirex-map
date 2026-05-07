@@ -54,12 +54,20 @@
   .header-meta{font-size:13px;color:var(--muted);font-family:'Ubuntu Mono',monospace}
   .header-meta b{color:var(--primary);font-weight:700}
   .brand-right{display:contents;}
+  /* Small screens: title goes on its own full-width row below the logos */
   .brand-text{flex-basis:100%;order:3;}
   .header-logos{display:flex;align-items:center;gap:16px;flex-wrap:wrap;align-self:flex-start;margin-left:auto;order:2;}
+  /* Large screens: title sits between MIREX logo and partner logos in one row */
+  @media(min-width:900px){
+    .brand-text{flex:1;flex-basis:auto;order:2;min-width:0;padding:0 20px;}
+    .header-logos{order:3;margin-left:0;align-self:center;}
+  }
   .header-logos a{display:flex;align-items:center;justify-content:center;}
   .header-logos img{height:40px;width:auto;max-width:140px;object-fit:contain;display:block;}
   .header-logos .logo-mpg img{height:60px;}
   @media(max-width:640px){.header-logos img{height:28px!important;} .header-logos .logo-mpg img{height:40px!important;}}
+  /* Hide map tooltip on touch devices — the label on the map is enough */
+  @media(hover:none){.map-tooltip{display:none!important}}
 
   /* ─── Dimension selector: pill buttons to switch map data ────────── */
   .dim-bar{
@@ -380,8 +388,8 @@
         <p class="chart-sub" id="chart-sub">Vertical line shows the European average for each dimension</p>
       </div>
       <div class="modes" id="modes" role="tablist">
-        <button class="chart-mode-btn active" role="tab" aria-selected="true" data-mode="countries">By country</button>
-        <button class="chart-mode-btn" role="tab" aria-selected="false" data-mode="dimensions">By dimension</button>
+        <button class="chart-mode-btn" role="tab" aria-selected="false" data-mode="countries">By country</button>
+        <button class="chart-mode-btn active" role="tab" aria-selected="true" data-mode="dimensions">By dimension</button>
       </div>
     </div>
     <div class="bars" id="bars"></div>
@@ -476,7 +484,7 @@ window.MIREX = (function(){
   const state = {
     dimension: "voluntary_returns",
     selectedCountry: null,
-    chartMode: "countries"
+    chartMode: "dimensions"
   };
 
   // Map a country display name in our dataset to the names used by Natural Earth (world-atlas)
@@ -509,6 +517,8 @@ window.MIREX = (function(){
     b.setAttribute("aria-pressed", "false");
     b.addEventListener("click", () => {
       state.dimension = d.key;
+      // Clicking a dimension always switches to "By country" view
+      state.chartMode = "countries";
       render();
     });
     dimPills.appendChild(b);
@@ -529,17 +539,43 @@ window.MIREX = (function(){
         ${b.desc}
       </div>
     `;
-    // tap to toggle on touch
+    // tap to toggle on touch; reposition popup to stay inside the viewport
     el.addEventListener("click", (ev) => {
       ev.stopPropagation();
-      document.querySelectorAll(".legend-band.open").forEach(x => { if (x !== el) x.classList.remove("open"); });
+      document.querySelectorAll(".legend-band.open").forEach(x => {
+        if (x !== el){ x.classList.remove("open"); resetPopPosition(x); }
+      });
       el.classList.toggle("open");
+      if (el.classList.contains("open")) fitPopToViewport(el);
+      else resetPopPosition(el);
     });
     legendGrid.appendChild(el);
   });
   document.addEventListener("click", () => {
-    document.querySelectorAll(".legend-band.open").forEach(x => x.classList.remove("open"));
+    document.querySelectorAll(".legend-band.open").forEach(x => { x.classList.remove("open"); resetPopPosition(x); });
   });
+
+  /* Shifts the popup horizontally so it does not overflow the screen edges. */
+  function fitPopToViewport(band){
+    const pop = band.querySelector(".pop");
+    if (!pop) return;
+    resetPopPosition(band);               // measure from neutral position first
+    const rect = pop.getBoundingClientRect();
+    const margin = 8;
+    if (rect.left < margin){
+      pop.style.left  = "0";
+      pop.style.right = "auto";
+      pop.style.transform = "none";
+    } else if (rect.right > window.innerWidth - margin){
+      pop.style.left  = "auto";
+      pop.style.right = "0";
+      pop.style.transform = "none";
+    }
+  }
+  function resetPopPosition(band){
+    const pop = band.querySelector(".pop");
+    if (pop){ pop.style.left = ""; pop.style.right = ""; pop.style.transform = ""; }
+  }
 
   /* ── Geographic map ──────────────────────────────────────────────────
      Sets up the SVG canvas, loads map data, and draws country shapes.
@@ -655,6 +691,16 @@ window.MIREX = (function(){
       .attr("fill", "#dbe2ec")
       .on("mousemove", function(ev, d){showTooltip(ev, d);const ne = d.properties && d.properties.name;const ourName = NE_TO_NAME[ne];hoverLayer.selectAll("*").remove();if (ourName && ourName !== state.selectedCountry && featureByName[ourName]){hoverLayer.append("path").datum(featureByName[ourName]).attr("class", "country-hover-outline").attr("d", pathGen);}})
       .on("mouseleave", function(){hideTooltip();hoverLayer.selectAll("*").remove();})
+      .on("touchstart", function(ev, d){
+        // Show hover outline on touch-and-hold (tooltip is hidden on touch devices via CSS)
+        const ne = d.properties && d.properties.name;
+        const ourName = NE_TO_NAME[ne];
+        hoverLayer.selectAll("*").remove();
+        if (ourName && featureByName[ourName]){
+          hoverLayer.append("path").datum(featureByName[ourName]).attr("class","country-hover-outline").attr("d", pathGen);
+        }
+      }, {passive:true})
+      .on("touchend", function(){ hoverLayer.selectAll("*").remove(); }, {passive:true})
       .on("click", function(ev, d){
         ev.stopPropagation();
         const ne = d.properties && d.properties.name;
