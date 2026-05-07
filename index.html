@@ -122,9 +122,9 @@
   .country-score{font:700 11px/1 'Ubuntu Mono',monospace;fill:#fff;pointer-events:none;text-anchor:middle;
     paint-order:stroke;stroke:var(--primary);stroke-width:3.5px;stroke-linejoin:round}
   .country-fullname{font:700 16px/1 'Ubuntu',sans-serif;fill:#fff;pointer-events:none;text-anchor:middle;letter-spacing:.02em;
-    paint-order:stroke;stroke:rgba(0,0,0,.55);stroke-width:3px;stroke-linejoin:round;transition:opacity .25s ease}
+    paint-order:stroke;stroke:rgba(0,0,0,.55);stroke-width:3px;stroke-linejoin:round}
   .country-bandlabel{font:600 10px/1 'Ubuntu Mono',monospace;fill:#fff;pointer-events:none;text-anchor:middle;letter-spacing:.08em;text-transform:uppercase;
-    paint-order:stroke;stroke:rgba(0,0,0,.5);stroke-width:2.4px;stroke-linejoin:round;transition:opacity .25s ease}
+    paint-order:stroke;stroke:rgba(0,0,0,.5);stroke-width:2.4px;stroke-linejoin:round}
 
 
   /* Keyboard focus styles */
@@ -1138,8 +1138,8 @@ window.MIREX = (function(){
       if (lab.fullName){
         lab.fullName
           .attr("style", isSel
-            ? `font-size:${24/k}px;stroke-width:${3/k}px`
-            : `display:none`)
+            ? `display:block;opacity:1;font-size:${24/k}px;stroke-width:${3/k}px`
+            : `display:none;opacity:0`)
           .attr("y", -22 / k);
       }
 
@@ -1147,8 +1147,8 @@ window.MIREX = (function(){
       lab.score
         .text(score)
         .attr("style", (!isZoomed || isSel)
-          ? `font-size:${isSel ? 28/k : 18}px;stroke-width:${isSel ? 3.4/k : 3.5}px`
-          : `display:none`)
+          ? `display:block;opacity:1;font-size:${isSel ? 28/k : 18}px;stroke-width:${isSel ? 3.4/k : 3.5}px`
+          : `display:none;opacity:0`)
         .attr("y", isSel ? 4 / k : 4);
 
       // Dimension label — visible only under the selected country's score
@@ -1156,8 +1156,8 @@ window.MIREX = (function(){
         lab.bandLabel
           .text(isSel ? currentDim().label : "")
           .attr("style", isSel
-            ? `font-size:${13/k}px;stroke-width:${2.4/k}px`
-            : `display:none`)
+            ? `display:block;opacity:1;font-size:${13/k}px;stroke-width:${2.4/k}px`
+            : `display:none;opacity:0`)
           .attr("y", 25 / k);
       }
     });
