@@ -197,7 +197,8 @@
   }
   .legend-band:hover .pop, .legend-band.open .pop{opacity:1;pointer-events:auto}
   .legend-band .pop::after{
-    content:"";position:absolute;top:100%;left:50%;transform:translateX(-50%);
+    content:"";position:absolute;top:100%;
+    left:calc(50% + var(--arrow-shift, 0px));transform:translateX(-50%);
     border:6px solid transparent;border-top-color:#fff;
   }
   .legend-band .pop .pop-name{display:block;font-weight:700;color:var(--primary);font-size:13px;margin-bottom:4px;font-family:'Ubuntu',sans-serif}
@@ -555,26 +556,27 @@ window.MIREX = (function(){
     document.querySelectorAll(".legend-band.open").forEach(x => { x.classList.remove("open"); resetPopPosition(x); });
   });
 
-  /* Shifts the popup horizontally so it does not overflow the screen edges. */
+  /* Shifts the popup horizontally (via margin-left) so it does not overflow
+     the screen edges. Also moves the arrow in the opposite direction so it
+     keeps pointing at the centre of the score band that was tapped. */
   function fitPopToViewport(band){
     const pop = band.querySelector(".pop");
     if (!pop) return;
-    resetPopPosition(band);               // measure from neutral position first
-    const rect = pop.getBoundingClientRect();
+    resetPopPosition(band);
+    const rect   = pop.getBoundingClientRect();
     const margin = 8;
-    if (rect.left < margin){
-      pop.style.left  = "0";
-      pop.style.right = "auto";
-      pop.style.transform = "none";
-    } else if (rect.right > window.innerWidth - margin){
-      pop.style.left  = "auto";
-      pop.style.right = "0";
-      pop.style.transform = "none";
+    let shift = 0;
+    if (rect.left < margin)                        shift = margin - rect.left;
+    else if (rect.right > window.innerWidth - margin) shift = (window.innerWidth - margin) - rect.right;
+    if (shift !== 0){
+      pop.style.marginLeft = shift + "px";
+      // Counter-shift the arrow so it still points at the band
+      pop.style.setProperty("--arrow-shift", (-shift) + "px");
     }
   }
   function resetPopPosition(band){
     const pop = band.querySelector(".pop");
-    if (pop){ pop.style.left = ""; pop.style.right = ""; pop.style.transform = ""; }
+    if (pop){ pop.style.marginLeft = ""; pop.style.removeProperty("--arrow-shift"); }
   }
 
   /* ── Geographic map ──────────────────────────────────────────────────
@@ -691,16 +693,6 @@ window.MIREX = (function(){
       .attr("fill", "#dbe2ec")
       .on("mousemove", function(ev, d){showTooltip(ev, d);const ne = d.properties && d.properties.name;const ourName = NE_TO_NAME[ne];hoverLayer.selectAll("*").remove();if (ourName && ourName !== state.selectedCountry && featureByName[ourName]){hoverLayer.append("path").datum(featureByName[ourName]).attr("class", "country-hover-outline").attr("d", pathGen);}})
       .on("mouseleave", function(){hideTooltip();hoverLayer.selectAll("*").remove();})
-      .on("touchstart", function(ev, d){
-        // Show hover outline on touch-and-hold (tooltip is hidden on touch devices via CSS)
-        const ne = d.properties && d.properties.name;
-        const ourName = NE_TO_NAME[ne];
-        hoverLayer.selectAll("*").remove();
-        if (ourName && featureByName[ourName]){
-          hoverLayer.append("path").datum(featureByName[ourName]).attr("class","country-hover-outline").attr("d", pathGen);
-        }
-      }, {passive:true})
-      .on("touchend", function(){ hoverLayer.selectAll("*").remove(); }, {passive:true})
       .on("click", function(ev, d){
         ev.stopPropagation();
         const ne = d.properties && d.properties.name;
