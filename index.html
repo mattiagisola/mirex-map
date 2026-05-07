@@ -897,93 +897,59 @@ window.MIREX = (function(){
      Content switches automatically when a country is selected. */
   const side = document.getElementById("side");
 
+  /* Side panel always shows the dimension overview regardless of country selection.
+     Country details are in the bottom bar chart panel instead. */
   function renderSide(){
-    const dim = currentDim();
-    if (state.selectedCountry){
-      const name = state.selectedCountry;
-      const row = data[name];
-      const sortedDims = dimensions.map(d => ({
-        ...d, value: row[d.key]
-      })).sort((a,b) => b.value - a.value);
+    const dim    = currentDim();
+    const ranked = Object.entries(data).map(([name, row]) => ({
+      name, value: row[state.dimension]
+    })).sort((a, b) => b.value - a.value);
+    const top    = ranked[0];
+    const bottom = ranked[ranked.length - 1];
+    const avg    = average[state.dimension];
 
-      side.innerHTML = `
-        <div class="country-head">
-          <div class="flagchip">${shortFor(name)}</div>
-          <div>
-            <h3 class="country-name">${name}</h3>
-            <div class="country-meta">MIREX country profile</div>
-          </div>
-        </div>
+    side.innerHTML = `
+      <div class="country-head">
+        <div class="flagchip" style="background:#074160;color:#fff">◆</div>
         <div>
-          <h4>All dimensions · ranked</h4>
-          <div class="mini-list">
-            ${sortedDims.map(d => `
-              <div class="mini-row">
-                <span class="swatch" style="background:${colorFor(d.value)}"></span>
-                <span class="name">${d.label}</span>
-                <span class="val">${d.value}</span>
-              </div>
-            `).join("")}
-          </div>
+          <h3 class="country-name">${dim.label}</h3>
+          <div class="country-meta">11 countries · dimension</div>
         </div>
-        <button class="clearbtn" id="clearbtn">← Clear selection</button>
-      `;
-      document.getElementById("clearbtn").addEventListener("click", () => {
-        state.selectedCountry = null; state.chartMode = "countries"; render();
-      });
-    } else {
-      const ranked = Object.entries(data).map(([name, row]) => ({
-        name, value: row[state.dimension]
-      })).sort((a,b) => b.value - a.value);
-      const top = ranked[0], bottom = ranked[ranked.length - 1];
-      const avg = state.dimension === "overall_score"
-        ? Math.round(ranked.reduce((s,r)=>s+r.value,0) / ranked.length)
-        : average[state.dimension];
-
-      side.innerHTML = `
-        <div class="country-head">
-          <div class="flagchip" style="background:#074160;color:#fff">◆</div>
-          <div>
-            <h3 class="country-name">${dim.label}</h3>
-            <div class="country-meta">11 countries · dimension</div>
-          </div>
+      </div>
+      <div class="scorebig" style="background:${colorFor(avg)}">
+        <div class="num">${avg}</div>
+        <div class="of">/100</div>
+        <div class="lbl" style="margin-left:auto">European<br>average</div>
+      </div>
+      <div class="band-desc">
+        <span class="pill">Range</span>
+        <b>${bottom.name}</b> ${bottom.value} → <b>${top.name}</b> ${top.value}.
+      </div>
+      <div>
+        <h4>Encouraging results</h4>
+        <div class="mini-list">
+          ${ranked.filter(r => r.value > 40).slice(0,3).map(r => `
+            <div class="mini-row">
+              <span class="swatch" style="background:${colorFor(r.value)}"></span>
+              <span class="name">${r.name}</span>
+              <span class="val">${r.value}</span>
+            </div>
+          `).join("")}
         </div>
-        <div class="scorebig" style="background:${colorFor(avg)}">
-          <div class="num">${avg}</div>
-          <div class="of">/100</div>
-          <div class="lbl" style="margin-left:auto">European<br>average</div>
+      </div>
+      <div>
+        <h4>Needs improvement</h4>
+        <div class="mini-list">
+          ${ranked.filter(r => r.value < 60).slice(-3).reverse().map(r => `
+            <div class="mini-row">
+              <span class="swatch" style="background:${colorFor(r.value)}"></span>
+              <span class="name">${r.name}</span>
+              <span class="val">${r.value}</span>
+            </div>
+          `).join("")}
         </div>
-        <div class="band-desc">
-          <span class="pill">Range</span>
-          <b>${bottom.name}</b> ${bottom.value} → <b>${top.name}</b> ${top.value}.
-          <br>&nbspClick any country to see its full profile.
-        </div>
-        <div>
-          <h4>Encouraging results</h4>
-          <div class="mini-list">
-            ${ranked.filter(r => r.value > 40).slice(0,3).map(r => `
-              <div class="mini-row">
-                <span class="swatch" style="background:${colorFor(r.value)}"></span>
-                <span class="name">${r.name}</span>
-                <span class="val">${r.value}</span>
-              </div>
-            `).join("")}
-          </div>
-        </div>
-        <div>
-          <h4>Needs improvement</h4>
-          <div class="mini-list">
-            ${ranked.filter(r => r.value < 60).slice(-3).reverse().map(r => `
-              <div class="mini-row">
-                <span class="swatch" style="background:${colorFor(r.value)}"></span>
-                <span class="name">${r.name}</span>
-                <span class="val">${r.value}</span>
-              </div>
-            `).join("")}
-          </div>
-        </div>
-      `;
-    }
+      </div>
+    `;
   }
 
   /* ── Bar chart ────────────────────────────────────────────────────────
@@ -1136,114 +1102,63 @@ window.MIREX = (function(){
     let tx = 0, ty = 0, k = 1;
     if (state.selectedCountry && featureByName[state.selectedCountry]){
       const feat = featureByName[state.selectedCountry];
-      const b = pathGen.bounds(feat); // [[x0,y0],[x1,y1]]
-      const bw = b[1][0] - b[0][0];
-      const bh = b[1][1] - b[0][1];
-      const cx = (b[0][0] + b[1][0]) / 2;
-      const cy = (b[0][1] + b[1][1]) / 2;
-      // Fit bbox into ~70% of the viewport so there's breathing room
+      const b   = pathGen.bounds(feat);
+      const bw  = b[1][0] - b[0][0];
+      const bh  = b[1][1] - b[0][1];
+      const cx  = (b[0][0] + b[1][0]) / 2;
+      const cy  = (b[0][1] + b[1][1]) / 2;
       const padX = VIEW_W * 0.7;
       const padY = VIEW_H * 0.7;
-      k = Math.min(padX / bw, padY / bh, 6); // cap so micro-states don't go crazy
+      k = Math.min(padX / bw, padY / bh, 6);
       if (!isFinite(k) || k < 1) k = 1;
-      tx = VIEW_W/2 - cx * k;
-      ty = VIEW_H/2 - cy * k;
+      tx = VIEW_W / 2 - cx * k;
+      ty = VIEW_H / 2 - cy * k;
     }
-    // Scale stroke widths inversely so borders don't bloat when zoomed in
+
+    // Animate the map group to the new pan/zoom position
     mapGroup.interrupt("zoom");
     mapGroup.transition("zoom").duration(650).ease(d3.easeCubicInOut)
-      .attr("transform", `translate(${tx},${ty}) scale(${k})`)
-      .attr("style", `--k:${k}`);
-    countriesLayer.selectAll("path.country").interrupt("stroke");
+      .attr("transform", `translate(${tx},${ty}) scale(${k})`);
+
     countriesLayer.selectAll("path.country")
-      .interrupt("stroke")
       .attr("vector-effect", "non-scaling-stroke")
       .attr("stroke-width", null);
-    // Default labels = sigla + score. Selected = full name (bigger) + score (bigger) + band label.
+
+    // Update label sizes and visibility immediately (no transition needed)
+    const isZoomed = !!state.selectedCountry;
     Object.keys(labelById).forEach(name => {
-  const lab = labelById[name];
-  const isSelected = state.selectedCountry === name;
-  const isZoomed = !!state.selectedCountry;
-  const score = data[name][state.dimension];
+      const lab      = labelById[name];
+      const isSel    = state.selectedCountry === name;
+      const score    = data[name][state.dimension];
 
-  // Sigla sempre nascosta
-  lab.code.attr("style", "display:none;opacity:0");
+      // Country code abbreviation — always hidden
+      lab.code.attr("style", "display:none");
 
-  // Vista zoom: nome completo visibile solo per il paese selezionato
-        if (lab.fullName){
+      // Full country name — visible only for the selected country
+      if (lab.fullName){
         lab.fullName
-          .style("display", isSelected ? "block" : "none")
-          .style("opacity", isSelected ? 1 : 0)
-          .attr("style", isSelected
-            ? `display:block;opacity:1;font-size:${24/k}px;stroke-width:${3/k}px`
-            : `display:none;opacity:0`
-          )
-          .attr("y", -22/k);
+          .attr("style", isSel
+            ? `font-size:${24/k}px;stroke-width:${3/k}px`
+            : `display:none`)
+          .attr("y", -22 / k);
       }
 
+      // Score number — visible for selected country, and for all countries when not zoomed
       lab.score
         .text(score)
-        .style("display", (!isZoomed || isSelected) ? "block" : "none")
-        .style("opacity", (!isZoomed || isSelected) ? 1 : 0)
-        .attr("style", (!isZoomed || isSelected)
-          ? `display:block;opacity:1;font-size:${isSelected ? 28/k : 18/k}px;stroke-width:${isSelected ? 3.4/k : 3.5/k}px`
-          : `display:none;opacity:0`
-        )
-        .attr("y", isSelected ? 4/k : 4);
+        .attr("style", (!isZoomed || isSel)
+          ? `font-size:${isSel ? 28/k : 18}px;stroke-width:${isSel ? 3.4/k : 3.5}px`
+          : `display:none`)
+        .attr("y", isSel ? 4 / k : 4);
 
+      // Dimension label — visible only under the selected country's score
       if (lab.bandLabel){
         lab.bandLabel
-          .text(isSelected ? currentDim().label : "")
-          .style("display", isSelected ? "block" : "none")
-          .style("opacity", isSelected ? 1 : 0)
-          .attr("style", isSelected
-            ? `display:block;opacity:1;font-size:${13/k}px;stroke-width:${2.4/k}px`
-            : `display:none;opacity:0`
-          )
-          .attr("y", 25/k);
-      }
-});
-    Object.keys(labelById).forEach(name => {
-      const lab = labelById[name];
-      const isSelected = state.selectedCountry === name;
-      const isZoomed = !!state.selectedCountry;
-      const score = data[name][state.dimension];
-
-      // Sigla sempre nascosta
-      lab.code.attr("style", "display:none;opacity:0");
-
-      // Vista zoom: nome completo visibile solo per il paese selezionato
-            if (lab.fullName){
-        lab.fullName
-          .style("display", isSelected ? "block" : "none")
-          .style("opacity", isSelected ? 1 : 0)
-          .attr("style", isSelected
-            ? `display:block;opacity:1;font-size:${24/k}px;stroke-width:${3/k}px`
-            : `display:none;opacity:0`
-          )
-          .attr("y", -22/k);
-      }
-
-      lab.score
-        .text(score)
-        .style("display", (!isZoomed || isSelected) ? "block" : "none")
-        .style("opacity", (!isZoomed || isSelected) ? 1 : 0)
-        .attr("style", (!isZoomed || isSelected)
-          ? `display:block;opacity:1;font-size:${isSelected ? 28/k : 18/k}px;stroke-width:${isSelected ? 3.4/k : 3.5/k}px`
-          : `display:none;opacity:0`
-        )
-        .attr("y", isSelected ? 4/k : 4);
-
-      if (lab.bandLabel){
-        lab.bandLabel
-          .text(isSelected ? currentDim().label : "")
-          .style("display", isSelected ? "block" : "none")
-          .style("opacity", isSelected ? 1 : 0)
-          .attr("style", isSelected
-            ? `display:block;opacity:1;font-size:${13/k}px;stroke-width:${2.4/k}px`
-            : `display:none;opacity:0`
-          )
-          .attr("y", 25/k);
+          .text(isSel ? currentDim().label : "")
+          .attr("style", isSel
+            ? `font-size:${13/k}px;stroke-width:${2.4/k}px`
+            : `display:none`)
+          .attr("y", 25 / k);
       }
     });
   }
