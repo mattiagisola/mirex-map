@@ -158,7 +158,7 @@
   .band-desc{font-size:13px;color:var(--ink);background:var(--secondary);border-radius:10px;padding:12px 14px;line-height:1.45}
   .band-desc .pill{display:inline-block;font-family:'Ubuntu Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;
     background:#fff;color:var(--primary);border-radius:999px;padding:3px 8px;margin-right:8px;border:1px solid var(--line)}
-  .mini-list{display:flex;flex-direction:column;gap:8px}
+  .mini-list{display:flex;flex-direction:column;gap:8px;min-height:76px}
   .mini-row{display:flex;align-items:center;gap:10px;font-size:13px}
   .mini-row .name{flex:1;color:var(--ink)}
   .mini-row .swatch{width:10px;height:10px;border-radius:2px}
@@ -878,19 +878,19 @@ window.MIREX = (function(){
     if (ourName){
       const score = data[ourName][state.dimension];
       const band = bandFor(score);
-      tt.innerHTML = `
+      tooltip.innerHTML = `
         <strong>${ourName}</strong>
         <div class="row"><span class="swatch" style="background:${band ? band.color : '#999'}"></span> ${dimLabel(state.dimension)}: <b style="margin-left:4px">${score}</b></div>
         <div class="row" style="opacity:.75;margin-top:2px">${band ? band.name : ''} · click to inspect</div>
       `;
     } else {
-      tt.innerHTML = `<strong>${ne || "-"}</strong><div class="row" style="opacity:.8">Not covered in MIREX</div>`;
+      tooltip.innerHTML = `<strong>${ne || "-"}</strong><div class="row" style="opacity:.8">Not covered in MIREX</div>`;
     }
     tooltip.style.left = x + "px";
     tooltip.style.top = y + "px";
     tooltip.style.opacity = "1";
   }
-  function hideTooltip(){ tt.style.opacity = "0"; }
+  function hideTooltip(){ tooltip.style.opacity = "0"; }
 
   /* ── Info panel (right column) ───────────────────────────────────────
      Shows either a dimension overview or a country detail card.
