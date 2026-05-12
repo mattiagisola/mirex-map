@@ -595,10 +595,11 @@
       return text;
     }
 
-    const [dimText, bandsText, dataText] = await Promise.all([
+    const [dimText, bandsText, dataText, labelsText] = await Promise.all([
       get(base + 'Dimensions').then(t => assertCSV(t, 'Dimensions')),
       get(base + encodeURIComponent('Score Bands')).then(t => assertCSV(t, 'Score Bands')),
-      get(base + 'Data').then(t => assertCSV(t, 'Data'))
+      get(base + 'Data').then(t => assertCSV(t, 'Data')),
+      get(base + 'Labels').then(t => assertCSV(t, 'Labels')).catch(() => '')
     ]);
 
     const dimensions = parseCSV(dimText)
@@ -616,7 +617,6 @@
 
     const dimKeys = dimensions.map(d => d.key);
     const data = {};
-    const sheetLabelOffsets = {};
     parseCSV(dataText).forEach(r => {
       const country = r.country;
       if (!country) return;
@@ -625,12 +625,20 @@
         const v = r[k] !== '' ? +r[k] : null;
         data[country][k] = (v != null && !isNaN(v)) ? v : null;
       });
-      const dx = r.label_dx !== '' && r.label_dx != null ? +r.label_dx : null;
-      const dy = r.label_dy !== '' && r.label_dy != null ? +r.label_dy : null;
-      if (dx != null && !isNaN(dx) || dy != null && !isNaN(dy)) {
-        sheetLabelOffsets[country] = [dx || 0, dy || 0];
-      }
     });
+
+    const sheetLabelOffsets = {};
+    if (labelsText) {
+      parseCSV(labelsText).forEach(r => {
+        const country = r.country;
+        if (!country) return;
+        const dx = r.label_dx !== '' && r.label_dx != null ? +r.label_dx : null;
+        const dy = r.label_dy !== '' && r.label_dy != null ? +r.label_dy : null;
+        if (dx != null && !isNaN(dx) || dy != null && !isNaN(dy)) {
+          sheetLabelOffsets[country] = [dx || 0, dy || 0];
+        }
+      });
+    }
 
     if (!Object.keys(data).length) throw new Error('No rows found in Data tab');
     const mirex = buildMIREX(data, dimensions, bands);
