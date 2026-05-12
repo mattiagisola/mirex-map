@@ -616,6 +616,7 @@
 
     const dimKeys = dimensions.map(d => d.key);
     const data = {};
+    const sheetLabelOffsets = {};
     parseCSV(dataText).forEach(r => {
       const country = r.country;
       if (!country) return;
@@ -624,10 +625,17 @@
         const v = r[k] !== '' ? +r[k] : null;
         data[country][k] = (v != null && !isNaN(v)) ? v : null;
       });
+      const dx = r.label_dx !== '' && r.label_dx != null ? +r.label_dx : null;
+      const dy = r.label_dy !== '' && r.label_dy != null ? +r.label_dy : null;
+      if (dx != null && !isNaN(dx) || dy != null && !isNaN(dy)) {
+        sheetLabelOffsets[country] = [dx || 0, dy || 0];
+      }
     });
 
     if (!Object.keys(data).length) throw new Error('No rows found in Data tab');
-    return buildMIREX(data, dimensions, bands);
+    const mirex = buildMIREX(data, dimensions, bands);
+    mirex.labelOffsets = sheetLabelOffsets;
+    return mirex;
   }
 
   /* ── BOOTSTRAP ─────────────────────────────────────────────────────
@@ -1043,7 +1051,7 @@ function _mirexAppReady(){
         const lab = labelByCountry[ourName];
         const feat = featureByName[ourName];
         if (!lab || !feat) return;
-        const adjust = LABEL_OFFSETS[ourName] || [0, 0];
+        const adjust = (window.MIREX.labelOffsets || {})[ourName] || LABEL_OFFSETS[ourName] || [0, 0];
         const c = pathGen.centroid(feat);
         if (isNaN(c[0])) return;
         lab.group.attr("transform", `translate(${c[0] + adjust[0]},${c[1] + adjust[1]})`);
