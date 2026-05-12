@@ -1032,16 +1032,9 @@ function _mirexAppReady(){
       loadingText.attr("x", w / 2).attr("y", h / 2);
       const pad = Math.min(w, h) * 0.05;
 
-      // Compute geographic centre and latitude range from the covered countries
-      const [[lon0, lat0], [lon1, lat1]] = coveredCollection.features.length
-        ? d3.geoBounds(coveredCollection)
-        : [[-10, 35], [30, 70]]; // fallback: Europe
-      const midLon  = (lon0 + lon1) / 2;
-      const latSpan = Math.max(lat1 - lat0, 1);
-
-      projection = d3.geoConicConformal()
-        .rotate([-midLon, 0])
-        .parallels([lat0 + latSpan * 0.17, lat1 - latSpan * 0.17])
+      // Mercator: north always up, countries in standard orientation regardless of region.
+      // fitExtent frames exactly the covered countries with no rotation or conic distortion.
+      projection = d3.geoMercator()
         .fitExtent([[pad, pad], [w - pad, h - pad]], coveredCollection);
       pathGen = d3.geoPath(projection);
       countriesLayer.selectAll("path.country").attr("d", pathGen);
